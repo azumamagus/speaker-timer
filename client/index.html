@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronômetro Controlado</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        .blink {
+            animation: blinker 1s linear infinite;
+        }
+
+        @keyframes blinker {
+            50% { opacity: 0; }
+        }
+
+        #message {
+            font-size: 2em;
+            font-weight: bold;
+            color: red;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            #timer {
+                font-size: 2em;
+            }
+
+            #message {
+                font-size: 1.5em;
+            }
+
+            .container {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container text-center">
+        <h1 class="mt-5">Cronômetro</h1>
+        <div id="timer" class="display-4">00:00:00</div>
+        <div id="message" class="alert alert-danger d-none">Seu tempo acabou!</div>
+        <div class="mt-3">
+            <input type="number" id="inputMinutes" placeholder="Minutos" class="form-control mb-2">
+            <button class="btn btn-primary btn-block" onclick="startTimer()">Start</button>
+            <button class="btn btn-secondary btn-block" onclick="stopTimer()">Stop</button>
+            <button class="btn btn-danger btn-block" onclick="resetTimer()">Reset</button>
+        </div>
+    </div>
+
+    <script>
+        let socket = new WebSocket('ws://localhost:8080');
+        let timerElement = document.getElementById('timer');
+        let messageElement = document.getElementById('message');
+        let timerInterval;
+        let remainingTime = 0;
+
+        socket.onmessage = function(event) {
+            let data = JSON.parse(event.data);
+            if (data.command === 'start') {
+                startTimer(data.time, false); // Don't send command again
+            } else if (data.command === 'stop') {
+                stopTimer(false); // Don't send command again
+            } else if (data.command === 'reset') {
+                resetTimer(false); // Don't send command again
+            }
+        };
+
+        function startTimer(time = null, sendCommandFlag = true) {
+            clearInterval(timerInterval);
+            messageElement.classList.add('d-none');
+
+            if (time !== null) {
+                remainingTime = time;
+            } else {
+                let inputMinutes = document.getElementById('inputMinutes').value;
+                remainingTime = parseInt(inputMinutes) * 60;
+                if (sendCommandFlag) sendCommand('start', remainingTime);
+            }
+
+            timerInterval = setInterval(() => {
+                if (remainingTime > 0) {
+                    remainingTime--;
+                    updateTimerDisplay();
+                    if (remainingTime <= 60) {
+                        timerElement.classList.add('blink');
+                    } else {
+                        timerElement.classList.remove('blink');
+                    }
+                } else {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    timerElement.classList.remove('blink');
+                    messageElement.classList.remove('d-none');
+                }
+            }, 1000);
+        }
+
+        function stopTimer(sendCommandFlag = true) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            timerElement.classList.remove('blink');
+            if (sendCommandFlag) sendCommand('stop');
+        }
+
+        function resetTimer(sendCommandFlag = true) {
+            stopTimer(false);
+            remainingTime = 0;
+            updateTimerDisplay();
+            messageElement.classList.add('d-none');
+            if (sendCommandFlag) sendCommand('reset');
+        }
+
+        function updateTimerDisplay() {
+            let hours = String(Math.floor(remainingTime / 3600)).padStart(2, '0');
+            let minutes = String(Math.floor((remainingTime % 3600) / 60)).padStart(2, '0');
+            let seconds = String(remainingTime % 60).padStart(2, '0');
+            timerElement.textContent = `${hours}:${minutes}:${seconds}`;
+        }
+
+        function sendCommand(command, time = null) {
+            socket.send(JSON.stringify({ command, time }));
+        }
+    </script>
+</body>
+</html>
