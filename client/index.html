@@ -51,7 +51,8 @@
     </div>
 
     <script>
-        let socket = new WebSocket('ws://localhost:8080');
+        // let socket = new WebSocket('ws://localhost:8080');
+        let socket = new WebSocket('ws:speaker-timer.onrender.com:8080');
         let timerElement = document.getElementById('timer');
         let messageElement = document.getElementById('message');
         let timerInterval;
